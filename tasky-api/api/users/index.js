@@ -1,5 +1,7 @@
 import express from 'express';
 import User from './userModel';
+import asyncHandler from 'express-async-handler';
+
 
 const router = express.Router(); // eslint-disable-line
 
@@ -10,23 +12,35 @@ router.get('/', async (req, res) => {
 });
 
 // register(Create)/Authenticate User
-router.post('/', async (req, res) => {
-    if (req.query.action === 'register') {  //if action is 'register' then save to DB
-        await User(req.body).save();
-        res.status(201).json({
-            code: 201,
-            msg: 'Successful created new user.',
-        });
+router.post('/', asyncHandler(async (req, res, next) => {
+    if (req.query.action === 'register') {
+        try {
+            const newUser = new User(req.body);
+            await newUser.save();
+            res.status(201).json({
+                code: 201,
+                msg: 'Successfully created new user.',
+            });
+        } catch (error) {
+            if (error.name === 'ValidationError') {
+                // Send a 400 response with the validation error message
+                res.status(400).json({ code: 400, msg: error.message });
+            } else {
+                // If it's not a validation error, pass it to the error handler
+                next(error);
+            }
+        }
     }
-    else {  //Must be an authenticate then!!! Query the DB and check if there's a match
+    else {
+        // Authenticate user logic
         const user = await User.findOne(req.body);
         if (!user) {
             return res.status(401).json({ code: 401, msg: 'Authentication failed' });
-        }else{
+        } else {
             return res.status(200).json({ code: 200, msg: "Authentication Successful", token: 'TEMPORARY_TOKEN' });
         }
     }
-});
+}));
 
 // Update a user
 router.put('/:id', async (req, res) => {
